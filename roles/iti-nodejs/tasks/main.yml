@@ -1,0 +1,26 @@
+- name: install node and npm
+  yum:
+    name: "{{ item }}"
+    state: installed
+  with_items:
+    - nodejs
+    - npm
+- name: install forever package
+  npm: name=forever state=present global=yes
+- name: create nodejs path
+  file: 
+    path: /var/nodejs
+    state: directory
+- name: copy server.js file
+  copy:
+    src: server.js
+    dest: /var/nodejs/server.js
+
+- name: check running nodejs application
+  command: forever list
+  register: forever_list
+  changed_when: false
+
+- name: start nodejs app
+  command: forever start /var/nodejs/server.js
+  when: " forever_list.stdout.find('/var/nodejs/server.js') == -1"
