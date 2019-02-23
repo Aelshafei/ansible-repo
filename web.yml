@@ -1,0 +1,71 @@
+---
+
+- name: configure all servers
+  hosts: general
+  become: true
+  tasks:
+    - name: install epel release and ntp
+      yum: name={{ item }} state=present
+      with_items:
+        - epel-release
+        - ntp
+    - name: start ntpd
+      service: name=ntpd state=started
+
+- name: configure httpd
+  hosts: web
+  #vars:
+  #  - env_name: production
+  become: true
+  tasks:
+    - name: install apache
+      yum: name=httpd state=present
+    - name: debug
+      debug: 
+        msg: "{{ test_var }}"
+    - name: start apache
+      service: 
+        name: httpd
+        state: started
+    - name: configure welcome page
+      template:
+        src: index.html.j2
+        dest: /usr/share/httpd/noindex/index.html
+      notify: restart apache
+
+  handlers:
+    - name: restart apache
+      service: name=httpd state=restarted
+
+
+- name: configure app server
+  hosts: app
+  become: true
+  tasks:
+    - name: install node and npm
+      yum:
+        name: "{{ item }}"
+        state: installed
+      with_items:
+        - nodejs
+        - npm
+    - name: install forever package
+      npm: name=forever state=present global=yes
+    - name: create nodejs path
+      file: 
+        path: /var/nodejs
+        state: directory
+    - name: copy server.js file
+      copy:
+        src: server.js
+        dest: /var/nodejs/server.js
+
+    - name: check running nodejs application
+      command: forever list
+      register: forever_list
+      changed_when: false
+ 
+    - name: start nodejs app
+      command: forever start /var/nodejs/server.js
+      when: " forever_list.stdout.find('/var/nodejs/server.js') == -1"
+      
